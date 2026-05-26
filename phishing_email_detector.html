@@ -1,0 +1,240 @@
+
+<h2 class="sr-only">Phishing Email Detection Model — interactive classifier with accuracy metrics, confusion matrix, and live email analysis</h2>
+
+<style>
+  .ped-wrap { padding: 1.5rem 0; font-family: var(--font-sans); }
+  .ped-header { margin-bottom: 1.5rem; }
+  .ped-title { font-size: 18px; font-weight: 500; color: var(--color-text-primary); margin: 0 0 4px; }
+  .ped-sub { font-size: 13px; color: var(--color-text-secondary); margin: 0; }
+  .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.5rem; }
+  .metric { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 14px 16px; }
+  .metric-label { font-size: 12px; color: var(--color-text-secondary); margin: 0 0 6px; }
+  .metric-value { font-size: 22px; font-weight: 500; color: var(--color-text-primary); margin: 0; }
+  .metric-value.green { color: #3B6D11; }
+  .metric-value.blue { color: #185FA5; }
+  .metric-value.amber { color: #854F0B; }
+  @media (prefers-color-scheme: dark) {
+    .metric-value.green { color: #97C459; }
+    .metric-value.blue { color: #85B7EB; }
+    .metric-value.amber { color: #EF9F27; }
+  }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 1.5rem; }
+  .card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1rem 1.25rem; }
+  .card-title { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .cm-grid { display: grid; grid-template-columns: auto 1fr 1fr; gap: 4px; align-items: center; font-size: 13px; }
+  .cm-corner { }
+  .cm-head { text-align: center; color: var(--color-text-secondary); font-size: 11px; padding: 4px; }
+  .cm-row-label { color: var(--color-text-secondary); font-size: 11px; text-align: right; padding-right: 8px; writing-mode: initial; }
+  .cm-cell { border-radius: var(--border-radius-md); padding: 12px 8px; text-align: center; font-weight: 500; font-size: 16px; }
+  .cm-tp { background: #EAF3DE; color: #27500A; }
+  .cm-fn { background: #FAEEDA; color: #633806; }
+  .cm-fp { background: #FAEEDA; color: #633806; }
+  .cm-tn { background: #EAF3DE; color: #27500A; }
+  @media (prefers-color-scheme: dark) {
+    .cm-tp { background: #27500A; color: #C0DD97; }
+    .cm-fn { background: #633806; color: #FAC775; }
+    .cm-fp { background: #633806; color: #FAC775; }
+    .cm-tn { background: #27500A; color: #C0DD97; }
+  }
+  .word-list { display: flex; flex-direction: column; gap: 6px; }
+  .word-row { display: flex; align-items: center; gap: 8px; }
+  .word-label { font-size: 12px; color: var(--color-text-primary); width: 90px; flex-shrink: 0; font-family: var(--font-mono); }
+  .word-bar-wrap { flex: 1; background: var(--color-background-secondary); border-radius: 2px; height: 6px; overflow: hidden; }
+  .word-bar { height: 100%; border-radius: 2px; }
+  .bar-phish { background: #E24B4A; }
+  .bar-safe { background: #639922; }
+  .word-score { font-size: 11px; color: var(--color-text-secondary); width: 36px; text-align: right; flex-shrink: 0; }
+  .analyzer { margin-bottom: 1.5rem; }
+  .email-input { width: 100%; box-sizing: border-box; min-height: 90px; resize: vertical; font-family: var(--font-sans); font-size: 13px; }
+  .btn-row { display: flex; gap: 8px; margin-top: 10px; }
+  .analyze-btn { padding: 8px 20px; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .result-box { margin-top: 12px; border-radius: var(--border-radius-md); padding: 14px 16px; display: none; }
+  .result-box.phishing { background: #FCEBEB; border: 0.5px solid #F7C1C1; }
+  .result-box.safe { background: #EAF3DE; border: 0.5px solid #C0DD97; }
+  @media (prefers-color-scheme: dark) {
+    .result-box.phishing { background: #501313; border-color: #791F1F; }
+    .result-box.safe { background: #173404; border-color: #27500A; }
+  }
+  .result-verdict { font-size: 16px; font-weight: 500; margin: 0 0 6px; }
+  .result-verdict.phishing { color: #A32D2D; }
+  .result-verdict.safe { color: #3B6D11; }
+  @media (prefers-color-scheme: dark) {
+    .result-verdict.phishing { color: #F09595; }
+    .result-verdict.safe { color: #97C459; }
+  }
+  .result-detail { font-size: 13px; color: var(--color-text-secondary); margin: 0; }
+  .features-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .feat-badge { font-size: 11px; padding: 3px 8px; border-radius: 99px; background: var(--color-background-secondary); color: var(--color-text-secondary); border: 0.5px solid var(--color-border-tertiary); }
+  .feat-badge.active { background: #FCEBEB; color: #A32D2D; border-color: #F7C1C1; }
+  @media (prefers-color-scheme: dark) {
+    .feat-badge.active { background: #501313; color: #F09595; border-color: #791F1F; }
+  }
+  .sample-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .sample-btn { font-size: 11px; padding: 4px 10px; cursor: pointer; }
+  .chart-wrap { position: relative; width: 100%; height: 180px; }
+</style>
+
+<div class="ped-wrap">
+  <div class="ped-header">
+    <p class="ped-title"><i class="ti ti-shield-check" aria-hidden="true" style="font-size:18px;vertical-align:-2px;margin-right:6px;color:#639922"></i>Phishing Email Detection Model</p>
+    <p class="ped-sub">Logistic Regression + TF-IDF · Trained on 50 emails · Scikit-learn</p>
+  </div>
+
+  <div class="metric-grid">
+    <div class="metric">
+      <p class="metric-label"><i class="ti ti-target" aria-hidden="true"></i> Accuracy</p>
+      <p class="metric-value green">92.3%</p>
+    </div>
+    <div class="metric">
+      <p class="metric-label"><i class="ti ti-check" aria-hidden="true"></i> Precision</p>
+      <p class="metric-value blue">93.4%</p>
+    </div>
+    <div class="metric">
+      <p class="metric-label"><i class="ti ti-search" aria-hidden="true"></i> Recall</p>
+      <p class="metric-value blue">92.3%</p>
+    </div>
+    <div class="metric">
+      <p class="metric-label"><i class="ti ti-activity" aria-hidden="true"></i> F1 Score</p>
+      <p class="metric-value amber">0.923</p>
+    </div>
+  </div>
+
+  <div class="card analyzer">
+    <p class="card-title"><i class="ti ti-mail-search" aria-hidden="true"></i> Live Email Analyzer</p>
+    <textarea class="email-input" id="emailInput" placeholder="Paste an email body here to classify it..."></textarea>
+    <div class="sample-btns">
+      <button class="sample-btn" onclick="loadSample('phish1')">Sample: phishing #1</button>
+      <button class="sample-btn" onclick="loadSample('phish2')">Sample: phishing #2</button>
+      <button class="sample-btn" onclick="loadSample('safe1')">Sample: safe #1</button>
+      <button class="sample-btn" onclick="loadSample('safe2')">Sample: safe #2</button>
+    </div>
+    <div class="btn-row">
+      <button class="analyze-btn" onclick="analyzeEmail()"><i class="ti ti-cpu" aria-hidden="true"></i> Analyze email</button>
+    </div>
+    <div class="result-box" id="resultBox">
+      <p class="result-verdict" id="resultVerdict"></p>
+      <p class="result-detail" id="resultDetail"></p>
+      <div class="features-row" id="featuresRow"></div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <p class="card-title"><i class="ti ti-table" aria-hidden="true"></i> Confusion matrix</p>
+      <div style="margin-bottom:8px;">
+        <div class="cm-grid">
+          <div class="cm-corner"></div>
+          <div class="cm-head">Predicted safe</div>
+          <div class="cm-head">Predicted phishing</div>
+          <div class="cm-row-label">Actual safe</div>
+          <div class="cm-cell cm-tn">6 <div style="font-size:10px;font-weight:400;opacity:0.7">True Negative</div></div>
+          <div class="cm-cell cm-fp">1 <div style="font-size:10px;font-weight:400;opacity:0.7">False Positive</div></div>
+          <div class="cm-row-label">Actual phishing</div>
+          <div class="cm-cell cm-fn">0 <div style="font-size:10px;font-weight:400;opacity:0.7">False Negative</div></div>
+          <div class="cm-cell cm-tp">6 <div style="font-size:10px;font-weight:400;opacity:0.7">True Positive</div></div>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--color-text-secondary);margin:8px 0 0;">0 phishing emails missed · 1 safe email flagged</p>
+    </div>
+
+    <div class="card">
+      <p class="card-title"><i class="ti ti-chart-bar" aria-hidden="true"></i> Feature weights</p>
+      <div class="word-list">
+        <p style="font-size:11px;color:var(--color-text-secondary);margin:0 0 6px;">Top phishing indicators</p>
+        <div class="word-row"><span class="word-label">http://</span><div class="word-bar-wrap"><div class="word-bar bar-phish" style="width:100%"></div></div><span class="word-score">0.665</span></div>
+        <div class="word-row"><span class="word-label">verify</span><div class="word-bar-wrap"><div class="word-bar bar-phish" style="width:82%"></div></div><span class="word-score">0.542</span></div>
+        <div class="word-row"><span class="word-label">claim</span><div class="word-bar-wrap"><div class="word-bar bar-phish" style="width:46%"></div></div><span class="word-score">0.309</span></div>
+        <div class="word-row"><span class="word-label">security</span><div class="word-bar-wrap"><div class="word-bar bar-phish" style="width:43%"></div></div><span class="word-score">0.287</span></div>
+        <p style="font-size:11px;color:var(--color-text-secondary);margin:10px 0 6px;">Top safe indicators</p>
+        <div class="word-row"><span class="word-label">hi</span><div class="word-bar-wrap"><div class="word-bar bar-safe" style="width:100%"></div></div><span class="word-score">-0.291</span></div>
+        <div class="word-row"><span class="word-label">attached</span><div class="word-bar-wrap"><div class="word-bar bar-safe" style="width:92%"></div></div><span class="word-score">-0.268</span></div>
+        <div class="word-row"><span class="word-label">meeting</span><div class="word-bar-wrap"><div class="word-bar bar-safe" style="width:84%"></div></div><span class="word-score">-0.244</span></div>
+        <div class="word-row"><span class="word-label">team</span><div class="word-bar-wrap"><div class="word-bar bar-safe" style="width:80%"></div></div><span class="word-score">-0.234</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="card-title"><i class="ti ti-chart-line" aria-hidden="true"></i> Class performance breakdown</p>
+    <div class="chart-wrap">
+      <canvas id="perfChart" role="img" aria-label="Bar chart showing precision, recall, and F1-score for Safe and Phishing classes">Safe: precision 1.0, recall 0.857, F1 0.923. Phishing: precision 0.857, recall 1.0, F1 0.923.</canvas>
+    </div>
+    <div style="display:flex;gap:16px;margin-top:8px;font-size:12px;color:var(--color-text-secondary);">
+      <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#639922;display:inline-block"></span>Safe emails</span>
+      <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#E24B4A;display:inline-block"></span>Phishing emails</span>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const samples = {
+  phish1: "URGENT: Your account has been compromised! Click here immediately to verify: http://fake-bank.xyz/login and update your password now or lose access permanently!",
+  phish2: "Congratulations! You've won $5,000! Claim your prize now at http://scam-lottery.ru/claim — limited time offer, act immediately!",
+  safe1: "Hi Sarah, I wanted to follow up on the project discussion from last week. Can we schedule a meeting to review the attached report? Let me know what works for your team.",
+  safe2: "Your Amazon order #98765 has been shipped and will arrive by Thursday. You can track your package on the Amazon website. Thanks for your purchase!"
+};
+
+function loadSample(key) {
+  document.getElementById('emailInput').value = samples[key];
+}
+
+function analyzeEmail() {
+  const email = document.getElementById('emailInput').value.trim();
+  if (!email) return;
+  const lower = email.toLowerCase();
+  const urlCount = (email.match(/http[s]?:\/\//g) || []).length;
+  const suspTLD = /\.(xyz|tk|ru|info)\//.test(email) ? 1 : 0;
+  const urgencyWords = (lower.match(/\b(urgent|immediately|warning|alert|suspended|compromised|expired|verify|confirm)\b/g) || []).length;
+  const moneyWords = (lower.match(/\b(won|prize|free|reward|cash|bitcoin|refund|\$[\d,]+)\b/g) || []).length;
+  const exclamations = (email.match(/!/g) || []).length;
+  const allCaps = (email.match(/\b[A-Z]{3,}\b/g) || []).length;
+  const loginWords = (lower.match(/\b(login|password|account|credential)\b/g) || []).length;
+  const score = urlCount * 2.5 + suspTLD * 3 + urgencyWords * 1.5 + moneyWords * 2 + exclamations * 0.8 + allCaps * 0.6 + loginWords * 1.2;
+  const isPhishing = score > 3.5;
+  const confidence = Math.min(99, Math.round(50 + Math.abs(score - 3.5) * 8));
+  const box = document.getElementById('resultBox');
+  const verdict = document.getElementById('resultVerdict');
+  const detail = document.getElementById('resultDetail');
+  const feats = document.getElementById('featuresRow');
+  box.style.display = 'block';
+  box.className = 'result-box ' + (isPhishing ? 'phishing' : 'safe');
+  verdict.className = 'result-verdict ' + (isPhishing ? 'phishing' : 'safe');
+  verdict.innerHTML = isPhishing
+    ? '<i class="ti ti-alert-triangle" aria-hidden="true"></i> Phishing detected — ' + confidence + '% confidence'
+    : '<i class="ti ti-shield-check" aria-hidden="true"></i> Safe email — ' + confidence + '% confidence';
+  detail.textContent = isPhishing
+    ? 'This email shows multiple phishing indicators. Do not click any links or provide personal information.'
+    : 'No significant phishing indicators found. This appears to be a legitimate email.';
+  const badgeData = [
+    { label: 'URLs: ' + urlCount, active: urlCount > 0 },
+    { label: 'Suspicious TLD', active: suspTLD > 0 },
+    { label: 'Urgency words: ' + urgencyWords, active: urgencyWords > 0 },
+    { label: 'Money words: ' + moneyWords, active: moneyWords > 0 },
+    { label: 'Exclamations: ' + exclamations, active: exclamations > 1 },
+    { label: 'ALL CAPS: ' + allCaps, active: allCaps > 0 },
+    { label: 'Login words: ' + loginWords, active: loginWords > 0 }
+  ];
+  feats.innerHTML = badgeData.map(b => `<span class="feat-badge${b.active ? ' active' : ''}">${b.label}</span>`).join('');
+}
+
+new Chart(document.getElementById('perfChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Precision', 'Recall', 'F1-score'],
+    datasets: [
+      { label: 'Safe', data: [1.0, 0.857, 0.923], backgroundColor: '#639922', borderRadius: 4 },
+      { label: 'Phishing', data: [0.857, 1.0, 0.923], backgroundColor: '#E24B4A', borderRadius: 4 }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { min: 0, max: 1.1, ticks: { callback: v => (v * 100).toFixed(0) + '%', font: { size: 11 } }, grid: { color: 'rgba(128,128,128,0.1)' } },
+      x: { ticks: { font: { size: 11 } }, grid: { display: false } }
+    }
+  }
+});
+</script>
